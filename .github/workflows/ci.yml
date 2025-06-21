@@ -9,16 +9,17 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code + submodules
+      # 1. just clone the repo (no submodules)
+      - name: Checkout code
         uses: actions/checkout@v3
-        with:
-          submodules: true
 
+      # 2. set up Python
       - name: Set up Python 3.11
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
+      # 3. install our deps
       - name: Install dependencies
         run: |
           python -m venv .venv
@@ -26,6 +27,7 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
+      # 4. run SA solver + validate via the contest checker in Alproject/
       - name: Run SA solver & validate
         run: |
           source .venv/bin/activate
@@ -35,6 +37,7 @@ jobs:
             python Alproject/lpcp-contest-2023/checker.py 1 $i < results/sa_$i.out
           done
 
+      # 5. run CP-SAT solver + validate
       - name: Run CP-SAT solver & validate
         run: |
           source .venv/bin/activate
@@ -44,12 +47,14 @@ jobs:
             python Alproject/lpcp-contest-2023/checker.py 1 $i < results/cp_$i.out
           done
 
+      # 6. bundle SA outputs
       - name: Package SA solutions
         run: |
           source .venv/bin/activate
           mkdir -p artifacts
           zip -j artifacts/solutions.zip results/sa_*.out
 
+      # 7. upload that ZIP
       - name: Upload SA ZIP artifact
         uses: actions/upload-artifact@v4
         with:
