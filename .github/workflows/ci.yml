@@ -32,7 +32,7 @@ jobs:
           mkdir -p results
           for i in {1..5}; do
             python code/sa/solver_sa.py data/p1/instance.$i.in results/sa_$i.out
-            python AIproject/lpcp-contest-2023/checker.py 1 $i < results/sa_$i.out
+            python Alproject/lpcp-contest-2023/checker.py 1 $i < results/sa_$i.out
           done
 
       - name: Run CP-SAT solver & validate
@@ -41,7 +41,7 @@ jobs:
           mkdir -p results
           for i in {1..5}; do
             python code/cp_sat/solver_cp.py data/p1/instance.$i.in results/cp_$i.out
-            python AIproject/lpcp-contest-2023/checker.py 1 $i < results/cp_$i.out
+            python Alproject/lpcp-contest-2023/checker.py 1 $i < results/cp_$i.out
           done
 
       - name: Package SA solutions
