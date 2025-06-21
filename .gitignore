@@ -1,21 +1,31 @@
+###############################################################################
 # Python artefacts
+###############################################################################
 __pycache__/
-*.py[cod]
+*.py[co]
 .venv/
 
-# Editor / OS
+###############################################################################
+# Editor / OS cruft
+###############################################################################
 .DS_Store
 .vscode/
 
+###############################################################################
 # Solver outputs
-results/
-artifacts/
+#   – ignore every file in these folders …
+###############################################################################
+results/*
+artifacts/*
 
-# keep final solutions only
-!results/
-!artifacts/
+#   – … but *keep* the final deliverables we care about
 !results/sa_*.out
 !artifacts/solutions.zip
 
-# Contest-repo virtual-env (if it ever appears)
-AIproject/lpcp-contest-2023/.venv/*.pyes # never track these
+###############################################################################
+# Misc
+###############################################################################
+*.pyes                      # VS-Code scratch files
+AIproject/lpcp-contest-2023/.venv/   # accidental venv in sub-module
+
+
