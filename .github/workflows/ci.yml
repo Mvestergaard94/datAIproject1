@@ -8,8 +8,9 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+
     steps:
-      # 1. just clone the repo (no submodules)
+      # 1. checkout the repo
       - name: Checkout code
         uses: actions/checkout@v3
 
@@ -27,7 +28,7 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 4. run SA solver + validate via the contest checker in AIproject/
+      # 4. run SA solver & validate
       - name: Run SA solver & validate
         run: |
           source .venv/bin/activate
@@ -37,7 +38,7 @@ jobs:
             python AIproject/lpcp-contest-2023/checker.py 1 $i < results/sa_$i.out
           done
 
-      # 5. run CP-SAT solver + validate
+      # 5. run CP-SAT solver & validate
       - name: Run CP-SAT solver & validate
         run: |
           source .venv/bin/activate
