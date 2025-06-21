@@ -1,3 +1,5 @@
+[![CI](https://github.com/Mvestergaard94/datAIproject1/actions/workflows/ci.yml/badge.svg)](https://github.com/Mvestergaard94/datAIproject1/actions)
+
 # datAIproject1
 
 # LP/CP Contest 2023 – Problem 1
