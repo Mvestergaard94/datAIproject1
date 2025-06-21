@@ -7,14 +7,12 @@ Simulated-Annealing solver for LP/CP-Contest 2023 – Problem 1.
 """
 
 from __future__ import annotations
-
-import sys
-import time
-import pathlib
+import time                      # ← add this RIGHT AFTER the other imports
 import random
-from typing import Tuple
-
 import numpy as np
+import sys
+import pathlib
+from typing import Tuple
 
 # --------------------------------------------------------------------------- #
 #  Local parser / writer                                                      #
@@ -139,7 +137,7 @@ def main() -> None:
     S, board = C.read_instance(inst)
     print(f"Loaded board {S}×{S}  free cells={np.sum(board == 2)}")
 
-    sol = anneal(board, seconds=20, verbose=verbose)
+    sol = anneal(board, seconds=40, verbose=verbose)
     C.write_solution(out, sol)
 
 
