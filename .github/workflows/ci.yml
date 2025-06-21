@@ -51,7 +51,7 @@ jobs:
           zip -j artifacts/solutions.zip results/sa_*.out
 
       - name: Upload SA ZIP artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: sa-solutions
           path: artifacts/solutions.zip
