@@ -18,4 +18,4 @@ artifacts/
 !artifacts/solutions.zip
 
 # Contest-repo virtual-env (if it ever appears)
-AIproject/lpcp-contest-2023/.venv/
+AIproject/lpcp-contest-2023/.venv/*.pyes # never track these
