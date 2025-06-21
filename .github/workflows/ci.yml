@@ -27,6 +27,10 @@ jobs:
           source .venv/bin/activate
           pip install --upgrade pip
           pip install -r requirements.txt
+             # 3.5 — make `code/` discoverable as a Python package
+      
+      - name: Configure PYTHONPATH
+        run: echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
 
       # 4. run SA solver & validate
       - name: Run SA solver & validate
