@@ -13,3 +13,7 @@ artifacts/
 
 # Contest-repo virtual-env (if it ever appears)
 AIproject/lpcp-contest-2023/.venv/
+
+# keep final solutions only
+!artifacts/solutions.zip
+!results/sa_*.out
