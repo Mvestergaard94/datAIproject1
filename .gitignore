@@ -1,0 +1,15 @@
+# Python artefacts
+__pycache__/
+*.py[cod]
+.venv/
+
+# Editor / OS
+.DS_Store
+.vscode/
+
+# Solver outputs
+results/
+artifacts/
+
+# Contest-repo virtual-env (if it ever appears)
+AIproject/lpcp-contest-2023/.venv/
