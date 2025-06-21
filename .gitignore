@@ -11,9 +11,11 @@ __pycache__/
 results/
 artifacts/
 
+# keep final solutions only
+!results/
+!artifacts/
+!results/sa_*.out
+!artifacts/solutions.zip
+
 # Contest-repo virtual-env (if it ever appears)
 AIproject/lpcp-contest-2023/.venv/
-
-# keep final solutions only
-!artifacts/solutions.zip
-!results/sa_*.out
