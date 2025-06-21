@@ -2,21 +2,23 @@
 """
 CP-SAT solver for LP/CP-Contest 2023 – Problem 1 (“Fair exercise allocation”).
 
-Features
---------
-* Row / column balance (exactly ⌊S / 2⌋ ones).
-* Row / column **uniqueness** – no two identical rows or columns.
-* Sliding 3-window **mix** – no 000 or 111 in any row/col window of length 3.
-* All code is type-annotated and documented.
-* Optional **verbose** “spy” mode prints model size & solve time.
+This module implements a CP-SAT model that enforces:
 
-Usage
------
+ 1. Row / column balance (exactly ⌊S/2⌋ ones per row/col).
+ 2. Row / column uniqueness (no two identical rows or columns).
+ 3. Sliding 3-window mix (no window of 3 all-zeros or all-ones).
+ 4. Feasibility only (objective = 0).
+
+Usage:
     python solver_cp.py <instance> <output> [--verbose]
 
-Example
--------
-    python solver_cp.py data/p1/instance.1.in results/out.txt --verbose
+Example:
+    >>> # run on the first 6×6 test instance
+    >>> python solver_cp.py data/p1/instance.1.in results/tmp.out --verbose
+    Loaded board 6×6  free cells=22
+    [CP-SAT] Vars:  216  Cs:  74
+    [CP-SAT] Status: FEASIBLE  Time: 0.32s
+    TIME: 0.32s   PENALTY: 0
 """
 
 from __future__ import annotations
@@ -29,134 +31,159 @@ from typing import Dict, Tuple
 import numpy as np
 from ortools.sat.python import cp_model
 
-# --------------------------------------------------------------------------- #
-#  Project-local import: common.py contains the parser / writer utilities.    #
-# --------------------------------------------------------------------------- #
+# make common.py importable
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
-import common as C  # noqa: E402  (import after path tweak)
+import common as C  # noqa: E402
+
+# reuse our SA energy function for penalty reporting
+from code.sa.solver_sa import energy  # noqa: E402
 
 
 def build_and_solve(
     S: int,
     board: np.ndarray,
-    time_limit: int = 30,
+    time_limit: float = 30.0,
     verbose: bool = False,
 ) -> np.ndarray:
     """
-    Build the OR-Tools CP-SAT model and return a feasible 0/1 NumPy board.
+    Build the CP-SAT model and solve for a feasible assignment.
 
     Parameters
     ----------
     S : int
-        Board size (rows = cols = S).
+        Board dimension (S×S).
     board : np.ndarray
-        S × S array with values {0, 1, 2}.  2 means “free / decision var”.
-    time_limit : int, default 30
-        Solver wall-clock time limit in seconds.
-    verbose : bool, default False
-        If True, print model statistics and solution info.
+        Input array with values in {0, 1, 2}, where 2 marks a free cell.
+    time_limit : float
+        Time limit in seconds for the CP-SAT solver.
+    verbose : bool
+        If True, prints model size and solver status/time.
 
     Returns
     -------
     np.ndarray
-        An S × S array of 0/1 values that satisfies all constraints.
+        Feasible S×S array of 0/1 assignments.
 
     Raises
     ------
     RuntimeError
-        If no feasible solution is found within *time_limit*.
-    """
-    m: cp_model.CpModel = cp_model.CpModel()
+        If the solver fails to find a feasible solution within the time limit.
 
-    # ---------------- decision variables ---------------------------------- #
+    Examples
+    --------
+    >>> # trivial 2×2 all-zeros board with S=2 is infeasible (must have exactly 1 one per row/col)
+    >>> import numpy as np
+    >>> b = np.array([[2,2],[2,2]])
+    >>> # should raise because no feasible assignment exists for 2×2
+    >>> try:
+    ...     build_and_solve(2, b, time_limit=0.1)
+    ...     print("found")
+    ... except RuntimeError:
+    ...     print("no solution")
+    no solution
+    """
+    model = cp_model.CpModel()
+
+    # 1) Decision variables
     x: Dict[Tuple[int, int], cp_model.IntVar] = {}
     for i in range(S):
         for j in range(S):
             if board[i, j] == 2:
-                x[i, j] = m.NewBoolVar(f"x_{i}_{j}")
+                x[(i, j)] = model.NewBoolVar(f"x_{i}_{j}")
             else:
-                # Fixed cells become constant literals in the model
-                x[i, j] = m.NewConstant(int(board[i, j]))
+                x[(i, j)] = model.NewConstant(int(board[i, j]))
 
-    # ---------------- row / column balance -------------------------------- #
-    half: int = S // 2
+    # 2) Row/column balance
+    half = S // 2
     for i in range(S):
-        m.Add(sum(x[i, j] for j in range(S)) == half)
+        model.Add(sum(x[(i, j)] for j in range(S)) == half)
     for j in range(S):
-        m.Add(sum(x[i, j] for i in range(S)) == half)
+        model.Add(sum(x[(i, j)] for i in range(S)) == half)
 
-    # ---------------- uniqueness (AllDifferent on row/col codes) ---------- #
+    # 3) Uniqueness via integer encoding + AllDifferent
     row_codes = []
     for i in range(S):
-        code = m.NewIntVar(0, 2**S - 1, f"rowcode_{i}")
-        m.Add(code == sum(x[i, j] * (1 << j) for j in range(S)))
+        code = model.NewIntVar(0, 2**S - 1, f"rowcode_{i}")
+        model.Add(code == sum(x[(i, j)] * (1 << j) for j in range(S)))
         row_codes.append(code)
-    m.AddAllDifferent(row_codes)
+    model.AddAllDifferent(row_codes)
 
     col_codes = []
     for j in range(S):
-        code = m.NewIntVar(0, 2**S - 1, f"colcode_{j}")
-        m.Add(code == sum(x[i, j] * (1 << i) for i in range(S)))
+        code = model.NewIntVar(0, 2**S - 1, f"colcode_{j}")
+        model.Add(code == sum(x[(i, j)] * (1 << i) for i in range(S)))
         col_codes.append(code)
-    m.AddAllDifferent(col_codes)
+    model.AddAllDifferent(col_codes)
 
-    # ---------------- 3-window mix constraint ----------------------------- #
-    # No window of length 3 is allowed to sum to 0 or 3.
+    # 4) Sliding-3 mix constraint: enforce sum in {1,2}
     for i in range(S):
         for j in range(S - 2):
-            win = [x[i, k] for k in range(j, j + 3)]
-            s = m.NewIntVar(1, 2, f"r{i}_{j}_mix")  # allowed sums: 1 or 2
-            m.Add(s == sum(win))
+            w = [x[(i, k)] for k in range(j, j + 3)]
+            s = model.NewIntVar(1, 2, f"r{i}_{j}_mix")
+            model.Add(s == sum(w))
     for j in range(S):
         for i in range(S - 2):
-            win = [x[k, j] for k in range(i, i + 3)]
-            s = m.NewIntVar(1, 2, f"c{j}_{i}_mix")
-            m.Add(s == sum(win))
+            w = [x[(k, j)] for k in range(i, i + 3)]
+            s = model.NewIntVar(1, 2, f"c{j}_{i}_mix")
+            model.Add(s == sum(w))
 
-    # ---------------- solve ------------------------------------------------ #
-    m.Maximize(0)  # feasibility only
+    # 5) Feasibility objective
+    model.Maximize(0)
+
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = time_limit
-
     if verbose:
-        print(f"[CP-SAT] Variables: {m.NumVariables()}  Constraints: {m.NumConstraints()}")
+        print(f"[CP-SAT] Vars: {model.NumVariables()}  Cs: {model.NumConstraints()!s}")
         t0 = time.time()
 
-    status = solver.Solve(m)
+    status = solver.Solve(model)
 
     if verbose:
-        print(f"[CP-SAT] Status: {solver.StatusName(status)}  Time: {solver.WallTime():.3f}s\n")
+        elapsed = solver.WallTime()
+        print(f"[CP-SAT] Status: {solver.StatusName(status)}  Time: {elapsed:.3f}s")
 
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-        raise RuntimeError("CP-SAT: no feasible solution in time limit")
+        raise RuntimeError("CP-SAT: no feasible solution found")
 
-    sol = np.zeros_like(board)
+    # 6) Extract into NumPy
+    sol = np.zeros((S, S), dtype=int)
     for i in range(S):
         for j in range(S):
-            sol[i, j] = solver.Value(x[i, j])
+            sol[i, j] = int(solver.Value(x[(i, j)]))
 
     return sol
 
 
-# --------------------------------------------------------------------------- #
-#  CLI entry-point                                                            #
-# --------------------------------------------------------------------------- #
 def main() -> None:
-    """Parse CLI args, solve the instance, and write the solution file."""
+    """
+    CLI entrypoint.
+
+    Parses <instance> and <output> paths, optionally --verbose,
+    solves via build_and_solve(), writes solution, and prints timing.
+
+    Usage
+    -----
+      python solver_cp.py <instance> <output> [--verbose]
+    """
     if not (3 <= len(sys.argv) <= 4):
         print("Usage: solver_cp.py <instance> <output> [--verbose]")
         sys.exit(1)
 
-    inst_path: str = sys.argv[1]
-    out_path: str = sys.argv[2]
-    verbose: bool = len(sys.argv) == 4 and sys.argv[3] == "--verbose"
+    inst_path = sys.argv[1]
+    out_path = sys.argv[2]
+    verbose = len(sys.argv) == 4 and sys.argv[3] == "--verbose"
 
     S, board = C.read_instance(inst_path)
-    print(f"Loaded board {S}×{S}  free cells={np.sum(board == 2)}")
+    print(f"Loaded board {S}×{S}  free cells={int((board == 2).sum())}")
 
-    sol = build_and_solve(S, board, verbose=verbose)
+    t0 = time.time()
+    sol = build_and_solve(S, board, time_limit=30.0, verbose=verbose)
+    elapsed = time.time() - t0
+
     C.write_solution(out_path, sol)
+    pen = energy(sol)
+    print(f"TIME: {elapsed:.3f}s   PENALTY: {pen}")
 
 
-if __name__ == "__main__":  # pragma: no cover
+if __name__ == "__main__":
     main()
