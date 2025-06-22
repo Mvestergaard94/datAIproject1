@@ -26,6 +26,17 @@ artifacts/*
 # Misc
 ###############################################################################
 *.pyes                      # VS-Code scratch files
+
+# ---- ignore logs folder ----
+logs/
+
+# ---- ignore raw solver outputs & metrics ----
+results/*.out
+results/metrics.csv
+
+# ---- but still keep the plots in version control ----
+!results/*.png
+
 AIproject/lpcp-contest-2023/.venv/   # accidental venv in sub-module
 
 

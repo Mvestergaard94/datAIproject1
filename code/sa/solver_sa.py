@@ -33,6 +33,17 @@ import numpy as np
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 import common as C  # noqa: E402
 
+import logging
+
+# ensure log directory exists
+pathlib.Path("logs/sa").mkdir(parents=True, exist_ok=True)
+
+logging.basicConfig(
+    filename="logs/sa/instance.log",
+    format="%(message)s",
+    level=logging.INFO
+)
+
 
 def random_fill(board: np.ndarray) -> np.ndarray:
     """
@@ -67,7 +78,6 @@ def random_fill(board: np.ndarray) -> np.ndarray:
         need = half - int((out[i] == 1).sum())
         choice = np.random.choice(free, need, replace=False)
         out[i, choice] = 1
-        # the rest of free → 0
         other = [j for j in free if j not in set(choice)]
         out[i, other] = 0
 
@@ -215,7 +225,7 @@ def main() -> None:
     Usage:
       python solver_sa.py <instance> <output> [--verbose]
 
-    Reads an instance file, runs SA for 40s, writes solution, prints stats.
+    Reads an instance file, runs SA for 40s, writes solution, prints stats, and logs penalty+time.
     """
     if not (3 <= len(sys.argv) <= 4):
         print("Usage: solver_sa.py <instance> <output> [--verbose]")
@@ -224,15 +234,24 @@ def main() -> None:
     inst_path, out_path = sys.argv[1], sys.argv[2]
     verbose = (len(sys.argv) == 4 and sys.argv[3] == "--verbose")
 
+    # read and report
     S, board = C.read_instance(inst_path)
     print(f"Loaded board {S}×{S}  free cells={(board == 2).sum()}")
 
+    # run SA
     start = time.time()
     sol = anneal(board, seconds=40.0, verbose=verbose)
     elapsed = time.time() - start
 
+    # write solution
     C.write_solution(out_path, sol)
+
+    # compute and log final penalty
     pen = energy(sol)
+    logging.info(f"PENALTY: {pen}")
+    logging.info(f"TIME:    {elapsed:.3f}s")
+
+    # echo back to user
     print(f"TIME: {elapsed:.3f}s   PENALTY: {pen}")
 
 

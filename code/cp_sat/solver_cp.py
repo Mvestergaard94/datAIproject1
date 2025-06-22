@@ -26,6 +26,7 @@ from __future__ import annotations
 import sys
 import time
 import pathlib
+import logging
 from typing import Dict, Tuple
 
 import numpy as np
@@ -36,7 +37,15 @@ sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 import common as C  # noqa: E402
 
 # reuse our SA energy function for penalty reporting
-from code.sa.solver_sa import energy  # noqa: E402
+from sa.solver_sa import energy  # noqa: E402
+
+# ensure log directory exists
+pathlib.Path("logs/cp").mkdir(parents=True, exist_ok=True)
+logging.basicConfig(
+    filename="logs/cp/instance.log",
+    format="%(message)s",
+    level=logging.INFO
+)
 
 
 def build_and_solve(
@@ -130,17 +139,24 @@ def build_and_solve(
     # 5) Feasibility objective
     model.Maximize(0)
 
+    # Count vars & constraints via the model protobuf
+    proto = model.Proto()
+    n_vars = len(proto.variables)
+    n_cons = len(proto.constraints)
+
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = time_limit
+
     if verbose:
-        print(f"[CP-SAT] Vars: {model.NumVariables()}  Cs: {model.NumConstraints()!s}")
-        t0 = time.time()
+        print(f"[CP-SAT] Vars: {n_vars}  Cs: {n_cons}")
 
     status = solver.Solve(model)
 
+    elapsed = solver.WallTime()
     if verbose:
-        elapsed = solver.WallTime()
         print(f"[CP-SAT] Status: {solver.StatusName(status)}  Time: {elapsed:.3f}s")
+        logging.info(f"VARS: {n_vars}  CS: {n_cons}")
+        logging.info(f"STATUS: {solver.StatusName(status)}  TIME: {elapsed:.3f}s")
 
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         raise RuntimeError("CP-SAT: no feasible solution found")
@@ -182,6 +198,10 @@ def main() -> None:
 
     C.write_solution(out_path, sol)
     pen = energy(sol)
+
+    logging.info(f"PENALTY: {pen}")
+    logging.info(f"TIME:    {elapsed:.3f}s")
+
     print(f"TIME: {elapsed:.3f}s   PENALTY: {pen}")
 
 
